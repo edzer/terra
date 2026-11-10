@@ -1,0 +1,239 @@
+# Change the coordinate reference system
+
+Change / transform the coordinate reference system ("projection") of a
+SpatVector, SpatRaster or a matrix with coordinates.
+
+## Usage
+
+``` r
+# S4 method for class 'SpatRaster'
+project(x, y, method, mask=FALSE, align_only=FALSE, res=NULL, 
+  origin=NULL, threads=FALSE, use_gdal=TRUE, by_util=FALSE, pipeline="", 
+  warpOpts=NULL, transOpts=NULL, filename="", ...)
+
+# S4 method for class 'SpatVector'
+project(x, y, partial=FALSE, pipeline="", transOpts=NULL)
+
+# S4 method for class 'SpatExtent'
+project(x, from, to)
+
+# S4 method for class 'matrix'
+project(x, from, to)
+```
+
+## Arguments
+
+- x:
+
+  SpatRaster, SpatVector, SpatExtent or matrix (with x and y columns)
+  whose coordinates to project
+
+- y:
+
+  if `x` is a SpatRaster, the preferred approach is for `y` to be a
+  SpatRaster as well, serving as a template for the geometry (extent and
+  resolution) of the output SpatRaster. Alternatively, you can provide a
+  coordinate reference system (CRS) description.
+
+  You can use the following formats to define coordinate reference
+  systems: WKT, PROJ.4 (e.g., `+proj=longlat +datum=WGS84`), or an EPSG
+  code (e.g., `"epsg:4326"`). But note that the PROJ.4 notation has been
+  deprecated, and you can only use it with the WGS84/NAD83 and NAD27
+  datums. Other datums are silently ignored.
+
+  If `x` is a SpatVector, you can provide a crs definition as discussed
+  above, or any other object from which such a crs can be extracted with
+  [`crs`](https://rspatial.github.io/terra/reference/crs.md)
+
+- partial:
+
+  logical. If `TRUE`, geometries that can only partially be represented
+  in the output crs are included in the output
+
+- method:
+
+  character. Method used for estimating the new cell values of a
+  SpatRaster. One of:
+
+  `bilinear`: bilinear interpolation (3x3 cell window). This is used by
+  default if the first layer of `x` is not categorical
+
+  `mean`: This can be a good choice with continuous variables if the
+  output cells overlap with multiple input cells.
+
+  `near`: nearest neighbor. This is used by default if the first layer
+  of `x` is categorical. This method is not a good choice for continuous
+  values.
+
+  `mode`: The modal value. This can be a good choice for categorical
+  rasters, if the output cells overlap with multiple input cells.
+
+  `cubic`: cubic interpolation (5x5 cell window).
+
+  `cubicspline`: cubic B-spline interpolation. (5x5 cell window).
+
+  `lanczos`: Lanczos windowed sinc resampling. (7x7 cell window).
+
+  `sum`: the weighted sum of all non-NA contributing grid cells.
+
+  `min, q1, median, q3, max`: the minimum, first quartile, median, third
+  quartile, or maximum value.
+
+  `rms`: the root-mean-square value of all non-NA contributing grid
+  cells.
+
+- mask:
+
+  logical. If `TRUE`, mask out areas outside the input extent. For
+  example, to avoid data wrapping around the date-line (see example with
+  Robinson projection). To remove cells that are `NA` in `y` (if `y` is
+  a SpatRaster) you can use the
+  [`mask`](https://rspatial.github.io/terra/reference/mask.md)` method`
+  after calling `project` (this function)
+
+- align_only:
+
+  logical. If `TRUE`, and `y` is a SpatRaster, the template is used for
+  the spatial resolution and origin, but the extent is set such that all
+  of the extent of `x` is included
+
+- res:
+
+  numeric. Can be used to set the resolution of the output raster if `y`
+  is a CRS
+
+- origin:
+
+  numeric. Can be used to set the origin of the output raster if `y` is
+  a CRS
+
+- threads:
+
+  logical or positive integer. If `TRUE`, multiple threads are used
+  (faster for large files), no more than the "threads" setting of
+  [`terraOptions`](https://rspatial.github.io/terra/reference/terraOptions.md).
+  A number sets the thread count for this call directly
+
+- use_gdal:
+
+  logical. If `TRUE` the GDAL-warp algorithm is used. Otherwise, a
+  slower internal algorithm is used that may be more accurate if there
+  is much variation in the cell sizes of the output raster. Only the
+  `near` and `bilinear` algorithms are available for the internal
+  algorithm
+
+- by_util:
+
+  logical. If `TRUE` and `use_gdal=TRUE`, the GDAL warp utility is used
+
+- pipeline:
+
+  character. A PROJ pipeline string to use for the coordinate
+  transformation instead of letting GDAL select one automatically. You
+  can use
+  [`proj_pipelines`](https://rspatial.github.io/terra/reference/proj_pipelines.md)
+  to find available pipelines. When a pipeline is set, `y` is still used
+  to set the output CRS
+
+- warpOpts:
+
+  character. GDAL warp options as `"KEY=VALUE"` strings (SpatRaster
+  only). Examples:
+  `c("SAMPLE_GRID=YES", "SAMPLE_STEPS=100", "SOURCE_EXTRA=8")`. See the
+  GDALWarpOptions documentation at
+  https://gdal.org/en/stable/api/gdalwarp_cpp.html. Ignored when
+  `use_gdal=FALSE`
+
+- transOpts:
+
+  character. Transformer options as `"KEY=VALUE"` strings. For
+  SpatRaster these are GDAL `-to` options (see
+  GDALCreateGenImgProjTransformer2). For SpatVector they are mapped onto
+  `OGRCoordinateTransformationOptions`. Examples:
+  `c("ALLOW_BALLPARK=NO", "DESIRED_ACCURACY=1", "AREA_OF_INTEREST=-100,30,-90,40")`.
+  If `x` is a SpatRaster, `y` is a SpatRaster, and `AREA_OF_INTEREST` is
+  not already in `transOpts`, the lon/lat extent of `y` is appended
+  automatically. Ignored for SpatRaster when `use_gdal=FALSE`
+
+- filename:
+
+  character. Output filename
+
+- ...:
+
+  additional arguments for writing files as in
+  [`writeRaster`](https://rspatial.github.io/terra/reference/writeRaster.md)
+
+- from:
+
+  character. Coordinate reference system of `x`
+
+- to:
+
+  character. Output coordinate reference system
+
+## Value
+
+SpatVector or SpatRaster
+
+## See also
+
+[`crs`](https://rspatial.github.io/terra/reference/crs.md),
+[`resample`](https://rspatial.github.io/terra/reference/resample.md),
+[`warp_scale`](https://rspatial.github.io/terra/reference/warp_scale.md),
+[`proj_pipelines`](https://rspatial.github.io/terra/reference/proj_pipelines.md)
+and [`projNetwork`](https://rspatial.github.io/terra/reference/gdal.md)
+to enable or disable PROJ network access for datum grid downloads.
+
+## Note
+
+The PROJ.4 notation of coordinate reference systems has been partly
+deprecated in the GDAL/PROJ library that is used by this function. You
+can still use this notation, but \*only\* with the WGS84 datum. Other
+datums are silently ignored.
+
+Transforming (projecting) raster data is fundamentally different from
+transforming vector data. Vector data can be transformed and
+back-transformed without loss in precision and without changes in the
+values. This is not the case with raster data. In each transformation
+the values for the new cells are estimated in some fashion. Therefore,
+if you need to match raster and vector data for analysis, you should
+generally transform the vector data.
+
+When using this method with a `SpatRaster`, the preferable approach is
+to provide a template `SpatRaster` as argument `y`. The template is then
+another raster dataset that you want your data to align with. If you do
+not have a template to begin with, you can do `project(rast(x), crs)`
+and then manipulate the output to get the template you want. For
+example, where possible use whole numbers for the extent and resolution
+so that you do not have to worry about small differences in the future.
+You can use commands like `dim(z) = c(180, 360)` or `res(z) <- 100000`.
+
+The output resolution should generally be similar to the input
+resolution, but there is no "correct" resolution in raster
+transformation. It is not obvious what this resolution is if you are
+using lon/lat data that spans a large North-South extent.
+
+## Examples
+
+``` r
+## SpatRaster
+if (FALSE) { # \dontrun{
+a <- rast(ncols=40, nrows=40, xmin=-110, xmax=-90, ymin=40, ymax=60, 
+          crs="+proj=longlat +datum=WGS84")
+values(a) <- 1:ncell(a)
+newcrs="+proj=lcc +lat_1=48 +lat_2=33 +lon_0=-100 +datum=WGS84"
+b <- rast(ncols=94, nrows=124, xmin=-944881, xmax=935118, ymin=4664377, ymax=7144377, crs=newcrs)
+w <- project(a, b)
+
+
+## SpatVector
+f <- system.file("ex/lux.shp", package="terra")
+v <- vect(f)
+crs(v, proj=TRUE)
+cat(crs(v), "\n")
+
+project(v, "+proj=moll")
+project(v, "EPSG:2169")
+} # }
+```
